@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Admin Portal — Gen-Z</title>
+    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: #030712;
+            color: #f8fafc;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #loginScreen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            width: 100%;
+            padding: 24px;
+        }
+        .login-card {
+            background: linear-gradient(135deg, #0f172a, #1e1b4b);
+            border: 2px solid #facc15;
+            border-radius: 24px;
+            padding: 36px 28px;
+            width: 100%;
+            max-width: 380px;
+            text-align: center;
+            box-shadow: 0 0 60px rgba(250,204,21,0.2);
+        }
+        .login-icon { font-size: 3.5rem; margin-bottom: 14px; animation: float 3s ease-in-out infinite; }
+        @keyframes float { 0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)} }
+        .login-title { font-size: 1.5rem; font-weight: 900; color: #facc15; margin-bottom: 6px; letter-spacing: 1px; }
+        .login-sub   { font-size: 0.78rem; color: #64748b; margin-bottom: 28px; }
+        .login-input {
+            width: 100%; background: #1e293b; border: 1px solid #334155; border-radius: 12px;
+            padding: 14px 16px; color: #f8fafc; font-size: 1rem; font-weight: 700;
+            letter-spacing: 3px; text-align: center; margin-bottom: 16px; outline: none; transition: border-color 0.2s;
+        }
+        .login-input:focus { border-color: #facc15; }
+        .btn-login {
+            background: linear-gradient(135deg, #eab308, #ca8a04); color: #000; border: none;
+            padding: 14px; border-radius: 12px; font-size: 1rem; font-weight: 900;
+            cursor: pointer; width: 100%; letter-spacing: 0.5px;
+        }
+        .login-err { color: #f87171; font-size: 0.82rem; font-weight: bold; margin-top: 10px; display: none; }
+        @keyframes shake { 0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)} }
+
+        #dashScreen { display: none; width: 100%; max-width: 900px; padding: 20px 16px 40px; }
+        .dash-header {
+            background: linear-gradient(135deg, #1e1b4b, #0f172a); border: 1px solid #facc15;
+            border-radius: 18px; padding: 20px 22px; margin-bottom: 20px;
+            display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
+        }
+        .dash-title { font-size: 1.3rem; font-weight: 900; color: #facc15; }
+        .dash-sub   { font-size: 0.72rem; color: #94a3b8; margin-top: 2px; }
+        .stat-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+        .stat-box {
+            flex: 1; min-width: 120px; background: #0f172a; border: 1px solid #1e293b;
+            border-radius: 14px; padding: 16px; text-align: center;
+        }
+        .stat-num { font-size: 1.6rem; font-weight: 900; }
+        .stat-label { font-size: 0.7rem; color: #64748b; margin-top: 4px; }
+        .table-wrap { background: #0f172a; border: 1px solid #1e293b; border-radius: 14px; overflow: hidden; margin-bottom: 16px; }
+        .table-toolbar {
+            padding: 14px 16px; display: flex; justify-content: space-between;
+            align-items: center; border-bottom: 1px solid #1e293b; flex-wrap: wrap; gap: 8px;
+        }
+        .toolbar-title { font-size: 0.88rem; font-weight: 800; color: #94a3b8; }
+        .btn-csv     { background: #22c55e; color: #000; border: none; padding: 8px 16px; border-radius: 8px; font-weight: 900; cursor: pointer; font-size: 0.82rem; }
+        .btn-refresh { background: #1e293b; color: #38bdf8; border: 1px solid #334155; padding: 8px 14px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 0.82rem; }
+        .tbl-scroll { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.78rem; min-width: 520px; }
+        th { background: #1e293b; color: #94a3b8; padding: 11px 10px; text-align: left; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.8px; }
+        td { padding: 10px 10px; border-bottom: 1px solid #1e293b; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: rgba(255,255,255,0.02); }
+        .live-dot { display:inline-block; width:7px; height:7px; background:#22c55e; border-radius:50%; margin-right:6px; animation:pulse 1.5s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.3} }
+        .badge-wallet { background:#1e293b; border-radius:6px; padding:2px 7px; font-family:monospace; font-size:0.68rem; color:#64748b; }
+        .badge-wallet.linked { color: #38bdf8; }
+        .badge-lvl { background:rgba(56,189,248,0.12); border:1px solid rgba(56,189,248,0.3); color:#38bdf8; border-radius:6px; padding:2px 7px; font-weight:800; font-size:0.68rem; white-space:nowrap; }
+        .btn-logout { background:#1e293b; color:#f87171; border:1px solid #ef4444; padding:8px 16px; border-radius:8px; font-weight:700; cursor:pointer; font-size:0.82rem; }
+        .empty-row td { text-align:center; color:#334155; padding:30px; font-size:0.85rem; }
+    </style>
+</head>
+<body>
+
+    <div id="loginScreen">
+        <div class="login-card">
+            <div class="login-icon">👑</div>
+            <div class="login-title">Admin Portal</div>
+            <div class="login-sub">Gen-Z — Master Control Panel</div>
+            <input type="password" id="inputAdminId" class="login-input"
+                   placeholder="Enter Admin Password" maxlength="30"
+                   onkeydown="if(event.key==='Enter') doLogin()" />
+            <button class="btn-login" onclick="doLogin()">🔐 Access Dashboard</button>
+            <div class="login-err" id="loginErr">⛔ Access Denied! Invalid Password.</div>
+        </div>
+    </div>
+
+    <div id="dashScreen">
+        <div class="dash-header">
+            <div>
+                <div class="dash-title">👑 Master Admin Portal</div>
+                <div class="dash-sub"><span class="live-dot"></span>Live P2P User Registry · Gen-Z</div>
+            </div>
+            <button class="btn-logout" onclick="doLogout()">🚪 Logout</button>
+        </div>
+        <div class="stat-row">
+            <div class="stat-box"><div class="stat-num" id="admUsers"    style="color:#38bdf8;">0</div><div class="stat-label">Total Users</div></div>
+            <div class="stat-box"><div class="stat-num" id="admTokens"   style="color:#facc15;">0</div><div class="stat-label">Total Tokens</div></div>
+            <div class="stat-box"><div class="stat-num" id="admDiamonds" style="color:#a78bfa;">0</div><div class="stat-label">Total 💎</div></div>
+            <div class="stat-box"><div class="stat-num" id="admWallets"  style="color:#4ade80;">0</div><div class="stat-label">Wallets Linked</div></div>
+        </div>
+        <div class="table-wrap">
+            <div class="table-toolbar">
+                <div class="toolbar-title">📋 User Registry</div>
+                <div style="display:flex;gap:8px;">
+                    <button class="btn-refresh" onclick="forceRefresh()">🔄 Refresh</button>
+                    <button class="btn-csv"     onclick="exportCSV()">📥 Export CSV</button>
+                </div>
+            </div>
+            <div class="tbl-scroll">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th><th>Telegram ID</th><th>Name</th><th>Level ⚡</th>
+                            <th>Tokens</th><th>💎</th><th>Wallet</th><th>Last Active</th>
+                        </tr>
+                    </thead>
+                    <tbody id="admBody">
+                        <tr class="empty-row"><td colspan="8">⏳ Loading users...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const ADMIN_PASSWORD = 'vipul2252'; // Admin login password
+
+        function doLogin() {
+            const entered = document.getElementById('inputAdminId').value.trim();
+            if (entered === ADMIN_PASSWORD) {
+                document.getElementById('loginScreen').style.display = 'none';
+                document.getElementById('dashScreen').style.display  = 'block';
+                initDashboard();
+            } else {
+                const err = document.getElementById('loginErr');
+                err.style.display = 'block';
+                err.style.animation = 'none';
+                requestAnimationFrame(() => err.style.animation = 'shake 0.3s ease');
+                document.getElementById('inputAdminId').value = '';
+            }
+        }
+
+        function doLogout() {
+            document.getElementById('loginScreen').style.display = 'flex';
+            document.getElementById('dashScreen').style.display  = 'none';
+            document.getElementById('inputAdminId').value = '';
+            document.getElementById('loginErr').style.display = 'none';
+        }
+
+        // P2P Distributed Mesh — 8 relay peers (max reliability)
+        const gun = Gun({
+            peers: [
+                // USA Peers
+                'https://gun-manhattan.herokuapp.com/gun',
+                'https://gun-us.herokuapp.com/gun',
+                'https://gunjs.herokuapp.com/gun',
+                'https://gun-sjc1.herokuapp.com/gun',
+                // Europe Peers
+                'https://gun-eu.herokuapp.com/gun',
+                'https://gun-ams1.herokuapp.com/gun',
+                // Community Peers
+                'https://peer.wallie.io/gun',
+                'https://www.raygun.live/gun'
+            ],
+            localStorage: true
+        });
+        const userRegistry = gun.get('apex_airdrop_ledger_v1');
+        const allUsers = {};
+
+        function initDashboard() {
+            userRegistry.map().on((data, key) => {
+                if (!data || !data.id) return;
+                allUsers[data.id] = data;
+                renderTable();
+            });
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('admBody');
+            const entries = Object.values(allUsers);
+            if (entries.length === 0) {
+                tbody.innerHTML = '<tr class="empty-row"><td colspan="8">No users found yet.</td></tr>';
+                return;
+            }
+            entries.sort((a, b) => parseInt(b.tokens || 0) - parseInt(a.tokens || 0));
+            let tu = 0, tt = 0, td = 0, tw = 0, html = '';
+            entries.forEach((u, i) => {
+                tu++;
+                tt += parseInt(u.tokens   || 0);
+                td += parseInt(u.diamonds || 0);
+                const dm = parseInt(u.diamonds || 0);
+                const lvl = u.level || (dm >= 160 ? 6 : dm >= 80 ? 5 : dm >= 40 ? 4 : dm >= 20 ? 3 : dm >= 10 ? 2 : 1);
+                const tapRate = u.coinsPerTap || (lvl === 6 ? 80 : lvl === 5 ? 40 : lvl === 4 ? 20 : lvl === 3 ? 10 : lvl === 2 ? 5 : 1);
+                const hasW = u.wallet && u.wallet !== 'Not Linked' && u.wallet.length > 4;
+                if (hasW) tw++;
+                const walletHtml = hasW
+                    ? `<span class="badge-wallet linked">${u.wallet.substring(0,6)}...${u.wallet.slice(-4)}</span>`
+                    : `<span class="badge-wallet">Not Linked</span>`;
+                html += `<tr>
+                    <td style="color:#334155;">${i+1}</td>
+                    <td style="font-family:monospace;color:#38bdf8;">${u.id}</td>
+                    <td style="font-weight:700;">${esc(u.name||'—')}</td>
+                    <td><span class="badge-lvl">Lv.${lvl} (+${tapRate}/tap)</span></td>
+                    <td style="color:#facc15;font-weight:900;">${parseInt(u.tokens||0).toLocaleString()}</td>
+                    <td style="color:#a78bfa;font-weight:900;">${u.diamonds||0}</td>
+                    <td>${walletHtml}</td>
+                    <td style="color:#64748b;font-size:0.7rem;">${timeAgo(u.lastActive)}</td>
+                </tr>`;
+            });
+            tbody.innerHTML = html;
+            document.getElementById('admUsers').innerText    = tu;
+            document.getElementById('admTokens').innerText   = tt.toLocaleString();
+            document.getElementById('admDiamonds').innerText = td;
+            document.getElementById('admWallets').innerText  = tw;
+        }
+
+        function forceRefresh() {
+            Object.keys(allUsers).forEach(k => delete allUsers[k]);
+            document.getElementById('admBody').innerHTML = '<tr class="empty-row"><td colspan="8">⏳ Refreshing...</td></tr>';
+            initDashboard();
+        }
+
+        function exportCSV() {
+            let csv = 'Telegram_ID,User_Name,Level,Tap_Rate,Tokens,Diamonds,Wallet_Address,Last_Active\n';
+            Object.values(allUsers).forEach(u => {
+                const dm = parseInt(u.diamonds || 0);
+                const lvl = u.level || (dm >= 160 ? 6 : dm >= 80 ? 5 : dm >= 40 ? 4 : dm >= 20 ? 3 : dm >= 10 ? 2 : 1);
+                const tapRate = u.coinsPerTap || (lvl === 6 ? 80 : lvl === 5 ? 40 : lvl === 4 ? 20 : lvl === 3 ? 10 : lvl === 2 ? 5 : 1);
+                const la = u.lastActive ? new Date(u.lastActive).toISOString() : '';
+                csv += `"${u.id}","${(u.name||'').replace(/"/g,'""')}",${lvl},${tapRate},${u.tokens||0},${u.diamonds||0},"${u.wallet||''}","${la}"\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url  = URL.createObjectURL(blob);
+            const a    = document.createElement('a');
+            a.href     = url;
+            a.download = `Apex_Airdrop_${new Date().toISOString().slice(0,10)}.csv`;
+            a.click();
+        }
+
+        function timeAgo(ts) {
+            if (!ts) return '—';
+            const d = Date.now() - ts;
+            if (d < 60000)    return 'Just now';
+            if (d < 3600000)  return Math.floor(d/60000)   + 'm ago';
+            if (d < 86400000) return Math.floor(d/3600000)  + 'h ago';
+            return Math.floor(d/86400000) + 'd ago';
+        }
+
+        function esc(str) {
+            return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        }
+    </script>
+</body>
+</html>
