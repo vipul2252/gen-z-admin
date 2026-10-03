@@ -170,7 +170,7 @@
         }
 
         // ── Supabase Configuration ──
-        const SUPABASE_URL      = 'https://fwkxjwsxdocryrlaumx.supabase.co';
+        const SUPABASE_URL      = 'https://fwkxjwsxxdocryrlaumx.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_rQk-_aXNqtc4dmCQwrO_-A_yjOeJQBT';
         const supabaseClient    = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -180,21 +180,37 @@
             document.getElementById('admBody').innerHTML =
                 '<tr class="empty-row"><td colspan="8">⏳ Loading users from Supabase...</td></tr>';
 
-            const { data, error } = await supabaseClient
-                .from('users')
-                .select('*')
-                .order('tokens', { ascending: false });
+            try {
+                const { data, error } = await supabaseClient
+                    .from('users')
+                    .select('*')
+                    .order('tokens', { ascending: false });
 
-            if (error) {
+                if (error) {
+                    let hint = '';
+                    if (error.message && error.message.includes('does not exist')) {
+                        hint = '<br><span style="color:#f5c842;font-size:0.85rem;">💡 Supabase Dashboard mein "users" table nahi mili. SQL Editor mein table banayein.</span>';
+                    } else if (error.code === '42501' || (error.message && error.message.includes('permission denied'))) {
+                        hint = '<br><span style="color:#f5c842;font-size:0.85rem;">💡 RLS (Row Level Security) block kar raha hai. Supabase Dashboard mein "users" table par RLS Disable karein.</span>';
+                    } else if (error.message && error.message.includes('apikey')) {
+                        hint = '<br><span style="color:#f5c842;font-size:0.85rem;">💡 Supabase API key check karein.</span>';
+                    }
+                    document.getElementById('admBody').innerHTML =
+                        `<tr class="empty-row"><td colspan="8" style="color:#f87171;padding:24px 12px;line-height:1.6;">
+                            ⚠️ <b>Supabase Error:</b> ${error.message || 'Check config'} (Code: ${error.code || 'N/A'})${hint}
+                        </td></tr>`;
+                    console.error('Supabase error:', error);
+                    return;
+                }
+
+                allUsers = {};
+                (data || []).forEach(u => { allUsers[u.id] = u; });
+                renderTable();
+            } catch (err) {
                 document.getElementById('admBody').innerHTML =
-                    '<tr class="empty-row"><td colspan="8">⚠️ Error loading users. Check Supabase config.</td></tr>';
-                console.error('Supabase error:', error);
-                return;
+                    `<tr class="empty-row"><td colspan="8" style="color:#f87171;padding:24px 12px;">⚠️ <b>Connection Error:</b> ${err.message || err}</td></tr>`;
+                console.error('Fetch error:', err);
             }
-
-            allUsers = {};
-            (data || []).forEach(u => { allUsers[u.id] = u; });
-            renderTable();
         }
 
         function renderTable() {
