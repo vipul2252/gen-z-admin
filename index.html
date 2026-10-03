@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Admin Portal — Gen-Z</title>
-    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -110,7 +110,7 @@
         <div class="dash-header">
             <div>
                 <div class="dash-title">👑 Master Admin Portal</div>
-                <div class="dash-sub"><span class="live-dot"></span>Live P2P User Registry · Gen-Z</div>
+                <div class="dash-sub"><span class="live-dot"></span>Live Supabase User Registry · Gen-Z</div>
             </div>
             <button class="btn-logout" onclick="doLogout()">🚪 Logout</button>
         </div>
@@ -169,51 +169,50 @@
             document.getElementById('loginErr').style.display = 'none';
         }
 
-        // P2P Distributed Mesh — 8 relay peers (max reliability)
-        const gun = Gun({
-            peers: [
-                // USA Peers
-                'https://gun-manhattan.herokuapp.com/gun',
-                'https://gun-us.herokuapp.com/gun',
-                'https://gunjs.herokuapp.com/gun',
-                'https://gun-sjc1.herokuapp.com/gun',
-                // Europe Peers
-                'https://gun-eu.herokuapp.com/gun',
-                'https://gun-ams1.herokuapp.com/gun',
-                // Community Peers
-                'https://peer.wallie.io/gun',
-                'https://www.raygun.live/gun'
-            ],
-            localStorage: true
-        });
-        const userRegistry = gun.get('apex_airdrop_ledger_v1');
-        const allUsers = {};
+        // ── Supabase Configuration ──
+        const SUPABASE_URL      = 'https://fwkxjwsxdocryrlaumx.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_rQk-_aXNqtc4dmCQwrO_-A_yjOeJQBT';
+        const supabaseClient    = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        function initDashboard() {
-            userRegistry.map().on((data, key) => {
-                if (!data || !data.id) return;
-                allUsers[data.id] = data;
-                renderTable();
-            });
+        let allUsers = {};
+
+        async function initDashboard() {
+            document.getElementById('admBody').innerHTML =
+                '<tr class="empty-row"><td colspan="8">⏳ Loading users from Supabase...</td></tr>';
+
+            const { data, error } = await supabaseClient
+                .from('users')
+                .select('*')
+                .order('tokens', { ascending: false });
+
+            if (error) {
+                document.getElementById('admBody').innerHTML =
+                    '<tr class="empty-row"><td colspan="8">⚠️ Error loading users. Check Supabase config.</td></tr>';
+                console.error('Supabase error:', error);
+                return;
+            }
+
+            allUsers = {};
+            (data || []).forEach(u => { allUsers[u.id] = u; });
+            renderTable();
         }
 
         function renderTable() {
-            const tbody = document.getElementById('admBody');
+            const tbody   = document.getElementById('admBody');
             const entries = Object.values(allUsers);
             if (entries.length === 0) {
                 tbody.innerHTML = '<tr class="empty-row"><td colspan="8">No users found yet.</td></tr>';
                 return;
             }
-            entries.sort((a, b) => parseInt(b.tokens || 0) - parseInt(a.tokens || 0));
             let tu = 0, tt = 0, td = 0, tw = 0, html = '';
             entries.forEach((u, i) => {
                 tu++;
                 tt += parseInt(u.tokens   || 0);
                 td += parseInt(u.diamonds || 0);
-                const dm = parseInt(u.diamonds || 0);
-                const lvl = u.level || (dm >= 160 ? 6 : dm >= 80 ? 5 : dm >= 40 ? 4 : dm >= 20 ? 3 : dm >= 10 ? 2 : 1);
-                const tapRate = u.coinsPerTap || (lvl === 6 ? 80 : lvl === 5 ? 40 : lvl === 4 ? 20 : lvl === 3 ? 10 : lvl === 2 ? 5 : 1);
-                const hasW = u.wallet && u.wallet !== 'Not Linked' && u.wallet.length > 4;
+                const dm      = parseInt(u.diamonds || 0);
+                const lvl     = u.level || (dm >= 160 ? 6 : dm >= 80 ? 5 : dm >= 40 ? 4 : dm >= 20 ? 3 : dm >= 10 ? 2 : 1);
+                const tapRate = u.coins_per_tap || (lvl === 6 ? 80 : lvl === 5 ? 40 : lvl === 4 ? 20 : lvl === 3 ? 10 : lvl === 2 ? 5 : 1);
+                const hasW    = u.wallet && u.wallet !== 'Not Linked' && u.wallet.length > 4;
                 if (hasW) tw++;
                 const walletHtml = hasW
                     ? `<span class="badge-wallet linked">${u.wallet.substring(0,6)}...${u.wallet.slice(-4)}</span>`
@@ -226,7 +225,7 @@
                     <td style="color:#facc15;font-weight:900;">${parseInt(u.tokens||0).toLocaleString()}</td>
                     <td style="color:#a78bfa;font-weight:900;">${u.diamonds||0}</td>
                     <td>${walletHtml}</td>
-                    <td style="color:#64748b;font-size:0.7rem;">${timeAgo(u.lastActive)}</td>
+                    <td style="color:#64748b;font-size:0.7rem;">${timeAgo(u.last_active)}</td>
                 </tr>`;
             });
             tbody.innerHTML = html;
@@ -237,19 +236,18 @@
         }
 
         function forceRefresh() {
-            Object.keys(allUsers).forEach(k => delete allUsers[k]);
-            document.getElementById('admBody').innerHTML = '<tr class="empty-row"><td colspan="8">⏳ Refreshing...</td></tr>';
             initDashboard();
         }
 
         function exportCSV() {
             let csv = 'Telegram_ID,User_Name,Level,Tap_Rate,Tokens,Diamonds,Wallet_Address,Last_Active\n';
             Object.values(allUsers).forEach(u => {
-                const dm = parseInt(u.diamonds || 0);
-                const lvl = u.level || (dm >= 160 ? 6 : dm >= 80 ? 5 : dm >= 40 ? 4 : dm >= 20 ? 3 : dm >= 10 ? 2 : 1);
-                const tapRate = u.coinsPerTap || (lvl === 6 ? 80 : lvl === 5 ? 40 : lvl === 4 ? 20 : lvl === 3 ? 10 : lvl === 2 ? 5 : 1);
-                const la = u.lastActive ? new Date(u.lastActive).toISOString() : '';
-                csv += `"${u.id}","${(u.name||'').replace(/"/g,'""')}",${lvl},${tapRate},${u.tokens||0},${u.diamonds||0},"${u.wallet||''}","${la}"\n`;
+                const dm      = parseInt(u.diamonds || 0);
+                const lvl     = u.level || (dm >= 160 ? 6 : dm >= 80 ? 5 : dm >= 40 ? 4 : dm >= 20 ? 3 : dm >= 10 ? 2 : 1);
+                const tapRate = u.coins_per_tap || (lvl === 6 ? 80 : lvl === 5 ? 40 : lvl === 4 ? 20 : lvl === 3 ? 10 : lvl === 2 ? 5 : 1);
+                const la      = u.last_active ? new Date(u.last_active).toISOString() : '';
+                const name    = (u.name || '').replace(/"/g, '""');
+                csv += `"${u.id}","${name}",${lvl},${tapRate},${u.tokens||0},${u.diamonds||0},"${u.wallet||''}","${la}"\n`;
             });
             const blob = new Blob([csv], { type: 'text/csv' });
             const url  = URL.createObjectURL(blob);
@@ -261,11 +259,11 @@
 
         function timeAgo(ts) {
             if (!ts) return '—';
-            const d = Date.now() - ts;
+            const d = Date.now() - new Date(ts).getTime(); // handles ISO timestamp from Supabase
             if (d < 60000)    return 'Just now';
-            if (d < 3600000)  return Math.floor(d/60000)   + 'm ago';
-            if (d < 86400000) return Math.floor(d/3600000)  + 'h ago';
-            return Math.floor(d/86400000) + 'd ago';
+            if (d < 3600000)  return Math.floor(d / 60000)   + 'm ago';
+            if (d < 86400000) return Math.floor(d / 3600000)  + 'h ago';
+            return Math.floor(d / 86400000) + 'd ago';
         }
 
         function esc(str) {
